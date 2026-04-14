@@ -71,7 +71,7 @@ with st.sidebar:
         st.rerun()
     st.divider()
 
-st.title("📢 Mural de Avisos Digital")
+st.title("📢 Outage St1")
 
 # Área de Postagem para Masters
 if st.session_state["perfil"] != "visitante":
