@@ -13,7 +13,7 @@ st.logo(URL_LOGO)
 # --- DICIONÁRIO DE USUÁRIOS ATUALIZADO ---
 USUARIOS = {
     "admin": ["notgnihsaw", "washington muniz"],
-    "victor melo": ["12345678", "Victor Melo"],  # Novo usuário adicionado
+    "victor melo": ["12345678", "victor melo"],  # Novo usuário adicionado
     "visitante": ["ver123", "Visitante"]
 }
 
