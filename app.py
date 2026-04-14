@@ -78,7 +78,7 @@ with st.sidebar:
         st.rerun()
     st.divider()
 
-st.title("📢 Mural de Avisos Digital")
+st.title("📢 Outage St1")
 
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
