@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 
-# --- CONFIGURAÇÃO ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Sistema de Avisos", layout="centered")
 
 # Dicionário de Usuários: 'login': ['senha', 'Nome Completo']
@@ -16,7 +16,7 @@ USUARIOS = {
 
 SETORES = ["Suporte", "Financeiro", "Administração", "Operacional", "Vendas"]
 
-# Inicializa variáveis de sessão de forma segura
+# Inicializa variáveis de sessão
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 if "nome_colaborador" not in st.session_state:
@@ -27,77 +27,96 @@ if "perfil" not in st.session_state:
 # --- LÓGICA DE LOGIN ---
 def login():
     st.title("🔐 Login do Sistema")
-    usuario_input = st.text_input("Usuário").lower().strip()
-    senha_input = st.text_input("Senha", type="password")
+    u_input = st.text_input("Usuário").lower().strip()
+    s_input = st.text_input("Senha", type="password")
     
     if st.button("Entrar"):
-        if usuario_input in USUARIOS and USUARIOS[usuario_input][0] == senha_input:
+        if u_input in USUARIOS and USUARIOS[u_input][0] == s_input:
             st.session_state["logado"] = True
-            st.session_state["perfil"] = usuario_input
-            st.session_state["nome_colaborador"] = USUARIOS[usuario_input][1]
+            st.session_state["perfil"] = u_input
+            st.session_state["nome_colaborador"] = USUARIOS[u_input][1]
             st.rerun()
         else:
             st.error("Usuário ou senha incorretos")
 
-# FORÇA O LOGIN: Se não estiver logado OU se o nome estiver vazio, para tudo e mostra login
-if not st.session_state["logado"] or st.session_state["nome_colaborador"] == "":
+# Bloqueio de segurança
+if not st.session_state["logado"]:
     login()
     st.stop()
 
 # --- FUNÇÕES DE DADOS ---
 def load_data():
-    if os.path.exists("avisos.csv"):
+    arquivo = "avisos.csv"
+    colunas = ["Data", "Autor", "Setor", "Aviso"]
+    if os.path.exists(arquivo):
         try:
-            df = pd.read_csv("avisos.csv")
-            if "Setor" not in df.columns:
-                df["Setor"] = "Geral"
+            df = pd.read_csv(arquivo)
+            # Garante que colunas novas existam se o arquivo for antigo
+            for col in colunas:
+                if col not in df.columns:
+                    df[col] = "N/A"
             return df
         except:
-            return pd.DataFrame(columns=["Data", "Autor", "Setor", "Aviso"])
-    return pd.DataFrame(columns=["Data", "Autor", "Setor", "Aviso"])
+            return pd.DataFrame(columns=colunas)
+    return pd.DataFrame(columns=colunas)
 
 def save_data(df):
     df.to_csv("avisos.csv", index=False)
 
-# --- INTERFACE PRINCIPAL ---
+# --- INTERFACE ---
 with st.sidebar:
-    st.write(f"👤 **{st.session_state['nome_colaborador']}**")
+    st.write(f"👤 Logado como: **{st.session_state['nome_colaborador']}**")
     if st.button("Sair"):
-        st.session_state.clear() # Limpa tudo para forçar login na volta
+        st.session_state.clear()
         st.rerun()
     st.divider()
 
 st.title("📢 Mural de Avisos Digital")
 
-# --- ÁREA DE POSTAGEM (APENAS MASTER) ---
+# Área de Postagem para Masters
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
-    
-    # Nome automático e travado
     st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
-    setor_selecionado = st.sidebar.selectbox("Setor Responsável", SETORES)
-    texto_aviso = st.sidebar.text_area("Mensagem do aviso")
+    setor_sel = st.sidebar.selectbox("Setor Responsável", SETORES)
+    texto = st.sidebar.text_area("Mensagem")
 
     if st.sidebar.button("Publicar Aviso"):
-        if texto_aviso:
-            nova_linha = {
+        if texto:
+            novo = {
                 "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
                 "Autor": st.session_state['nome_colaborador'],
-                "Setor": setor_selecionado,
-                "Aviso": texto_aviso
+                "Setor": setor_sel,
+                "Aviso": texto
             }
-            df = load_data()
-            df = pd.concat([pd.DataFrame([nova_linha]), df], ignore_index=True)
-            save_data(df)
-            st.sidebar.success("Aviso publicado!")
+            df_atual = load_data()
+            df_novo = pd.concat([pd.DataFrame([novo]), df_atual], ignore_index=True)
+            save_data(df_novo)
+            st.sidebar.success("Publicado!")
             st.rerun()
         else:
-            st.sidebar.error("Escreva a mensagem.")
+            st.sidebar.error("Escreva algo.")
 else:
-    st.sidebar.info("Modo Visualização")
+    st.sidebar.info("Apenas visualização.")
 
 # --- EXIBIÇÃO ---
 st.subheader("Avisos Recentes")
 df_display = load_data()
 
-if not df
+if not df_display.empty:
+    for i, row in df_display.iterrows():
+        with st.container():
+            c1, c2 = st.columns([0.85, 0.15])
+            with c1:
+                st.markdown(f"### {row['Autor']} | {row['Setor']}")
+                st.caption(f"📅 {row['Data']}")
+                st.info(row['Aviso'])
+            with c2:
+                if st.session_state["perfil"] != "visitante":
+                    st.write("")
+                    if st.button("🗑️", key=f"del_{i}"):
+                        df_res = df_display.drop(i)
+                        save_data(df_res)
+                        st.rerun()
+            st.divider()
+else:
+    st.write("Nenhum aviso no momento.")
