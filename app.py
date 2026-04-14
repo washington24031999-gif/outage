@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
@@ -25,6 +25,11 @@ if "nome_colaborador" not in st.session_state:
 if "perfil" not in st.session_state:
     st.session_state["perfil"] = None
 
+# --- FUNÇÃO PARA PEGAR HORA DE BRASÍLIA ---
+def get_brasilia_time():
+    # Ajusta para UTC-3 (Horário de Brasília)
+    return datetime.utcnow() - timedelta(hours=3)
+
 # --- LOGIN ---
 def login():
     col_l, col_c, col_r = st.columns([1, 2, 1])
@@ -46,14 +51,12 @@ if not st.session_state["logado"]:
     login()
     st.stop()
 
-# --- DADOS (COM CORREÇÃO DE DTYPE) ---
+# --- DADOS ---
 def load_data():
     arquivo = "avisos.csv"
     colunas_obrigatorias = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
-    
     if os.path.exists(arquivo):
         try:
-            # Forçamos todas as colunas a serem lidas como STRING (object)
             df = pd.read_csv(arquivo, dtype=str).fillna("")
             for col in colunas_obrigatorias:
                 if col not in df.columns:
@@ -64,7 +67,6 @@ def load_data():
     return pd.DataFrame(columns=colunas_obrigatorias)
 
 def save_data(df):
-    # Garantimos que tudo seja salvo como string para evitar erros na próxima leitura
     df.astype(str).to_csv("avisos.csv", index=False)
 
 # --- INTERFACE ---
@@ -80,14 +82,13 @@ st.title("📢 Mural de Avisos Digital")
 
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
-    st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
     setor_sel = st.sidebar.selectbox("Setor Responsável", SETORES)
     texto = st.sidebar.text_area("Mensagem do aviso")
 
     if st.sidebar.button("Publicar Aviso"):
         if texto:
             novo = {
-                "Data": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "Data": get_brasilia_time().strftime("%d/%m/%Y %H:%M"),
                 "Autor": st.session_state['nome_colaborador'],
                 "Setor": setor_sel,
                 "Aviso": texto,
@@ -99,25 +100,25 @@ if st.session_state["perfil"] != "visitante":
             save_data(df_novo)
             st.rerun()
 
-# --- EXIBIÇÃO ---
+# --- EXIBIÇÃO (NOME REMOVIDO DAQUI) ---
 st.subheader("Avisos Recentes")
 df_display = load_data()
 
 if not df_display.empty:
     for i, row in df_display.iterrows():
-        # Verificação robusta do status
         status_atual = str(row["Status"]).strip()
         is_resolvido = status_atual == "Resolvido"
         
         with st.container():
             c1, c2 = st.columns([0.80, 0.20])
             with c1:
+                # Aqui removemos o Autor e Setor, deixando apenas Data e Status
                 status_txt = "✅ RESOLVIDO" if is_resolvido else "⏳ PENDENTE"
-                st.markdown(f"### {row['Autor']} | {row['Setor']} | {status_txt}")
-                st.caption(f"📅 Postado em: {row['Data']}")
+                st.markdown(f"### {status_txt}") 
+                st.caption(f"📅 {row['Data']}") # Data e Horário corrigidos
                 
                 if is_resolvido:
-                    st.success(f"{row['Aviso']}\n\n*Resolvido por: {row['Resolvido_Por']}*")
+                    st.success(f"{row['Aviso']}\n\n*Concluído em: {row['Data']}*")
                 else:
                     st.info(row['Aviso'])
             
@@ -126,10 +127,10 @@ if not df_display.empty:
                     st.write("")
                     if not is_resolvido:
                         if st.button("✅", key=f"res_{i}"):
-                            # Forçamos a conversão do DF para garantir que aceite texto
                             df_display = df_display.astype(object)
                             df_display.at[i, "Status"] = "Resolvido"
-                            df_display.at[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {datetime.now().strftime('%d/%m %H:%M')}"
+                            # Salva o momento da resolução com hora certa também
+                            df_display.at[i, "Resolvido_Por"] = f"{get_brasilia_time().strftime('%d/%m %H:%M')}"
                             save_data(df_display)
                             st.rerun()
                     
