@@ -7,7 +7,6 @@ import os
 st.set_page_config(page_title="Sistema de Avisos", layout="centered")
 
 # Dicionário de Usuários: 'login': ['senha', 'Nome Completo']
-# Aqui você pode adicionar os novos usuários Master futuramente
 USUARIOS = {
     "admin": ["master123", "Washington Silva"],
     "joao_sup": ["master456", "João Souza"],
@@ -16,6 +15,14 @@ USUARIOS = {
 }
 
 SETORES = ["Suporte", "Financeiro", "Administração", "Operacional", "Vendas"]
+
+# Inicializa as variáveis de sessão para evitar o KeyError
+if "logado" not in st.session_state:
+    st.session_state["logado"] = False
+if "perfil" not in st.session_state:
+    st.session_state["perfil"] = None
+if "nome_colaborador" not in st.session_state:
+    st.session_state["nome_colaborador"] = ""
 
 # --- LÓGICA DE LOGIN ---
 def login():
@@ -32,16 +39,22 @@ def login():
         else:
             st.error("Usuário ou senha incorretos")
 
-if "logado" not in st.session_state:
+if not st.session_state["logado"]:
     login()
     st.stop()
 
 # --- FUNÇÕES DE DADOS ---
 def load_data():
     if os.path.exists("avisos.csv"):
-        return pd.read_csv("avisos.csv")
+        try:
+            df = pd.read_csv("avisos.csv")
+            # Verifica se a coluna Setor existe (caso o arquivo seja antigo)
+            if "Setor" not in df.columns:
+                df["Setor"] = "Geral"
+            return df
+        except:
+            return pd.DataFrame(columns=["Data", "Autor", "Setor", "Aviso"])
     else:
-        # Adicionei a coluna 'Setor'
         return pd.DataFrame(columns=["Data", "Autor", "Setor", "Aviso"])
 
 def save_data(df):
@@ -49,23 +62,19 @@ def save_data(df):
 
 # --- INTERFACE ---
 if st.sidebar.button("Sair"):
-    del st.session_state["logado"]
+    st.session_state["logado"] = False
+    st.session_state["perfil"] = None
     st.rerun()
 
 st.title("📢 Mural de Avisos Digital")
 st.write(f"Bem-vindo, **{st.session_state['nome_colaborador']}**")
 
 # --- ÁREA DO MASTER ---
-# Verifica se o usuário não é o 'visitante' (ou seja, é um Master)
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
     
-    # Nome Automático (puxado do login)
     st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
-    
-    # Seleção de Setor
     setor_selecionado = st.sidebar.selectbox("Setor Responsável", SETORES)
-    
     texto_aviso = st.sidebar.text_area("Mensagem do aviso")
 
     if st.sidebar.button("Publicar Aviso"):
@@ -82,14 +91,7 @@ if st.session_state["perfil"] != "visitante":
             st.sidebar.success("Aviso publicado!")
             st.rerun()
         else:
-            st.sidebar.error("Escreva a mensagem do aviso.")
-            
-    # Dica para você: Onde adicionar novos Masters
-    st.sidebar.divider()
-    st.sidebar.caption("Para adicionar novos usuários Master, edite o dicionário 'USUARIOS' no código fonte do GitHub.")
-
-else:
-    st.sidebar.info("Modo de visualização. Você não tem permissão para postar.")
+            st.sidebar.error("Escreva a mensagem.")
 
 # --- EXIBIÇÃO ---
 st.subheader("Avisos Recentes")
@@ -99,13 +101,10 @@ if not df_display.empty:
     for i, row in df_display.iterrows():
         with st.container():
             col1, col2 = st.columns([0.85, 0.15])
-            
             with col1:
-                # Exibe o Setor junto com o nome
                 st.markdown(f"### {row['Autor']} | {row['Setor']}")
                 st.caption(f"Postado em: {row['Data']}")
                 st.info(row['Aviso'])
-            
             with col2:
                 if st.session_state["perfil"] != "visitante":
                     st.write("")
