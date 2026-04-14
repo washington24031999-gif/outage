@@ -16,30 +16,31 @@ USUARIOS = {
 
 SETORES = ["Suporte", "Financeiro", "Administração", "Operacional", "Vendas"]
 
-# Inicializa as variáveis de sessão para evitar o KeyError
+# Inicializa variáveis de sessão de forma segura
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
-if "perfil" not in st.session_state:
-    st.session_state["perfil"] = None
 if "nome_colaborador" not in st.session_state:
     st.session_state["nome_colaborador"] = ""
+if "perfil" not in st.session_state:
+    st.session_state["perfil"] = None
 
 # --- LÓGICA DE LOGIN ---
 def login():
     st.title("🔐 Login do Sistema")
-    usuario = st.text_input("Usuário")
-    senha = st.text_input("Senha", type="password")
+    usuario_input = st.text_input("Usuário").lower().strip()
+    senha_input = st.text_input("Senha", type="password")
     
     if st.button("Entrar"):
-        if usuario in USUARIOS and USUARIOS[usuario][0] == senha:
+        if usuario_input in USUARIOS and USUARIOS[usuario_input][0] == senha_input:
             st.session_state["logado"] = True
-            st.session_state["perfil"] = usuario
-            st.session_state["nome_colaborador"] = USUARIOS[usuario][1]
+            st.session_state["perfil"] = usuario_input
+            st.session_state["nome_colaborador"] = USUARIOS[usuario_input][1]
             st.rerun()
         else:
             st.error("Usuário ou senha incorretos")
 
-if not st.session_state["logado"]:
+# FORÇA O LOGIN: Se não estiver logado OU se o nome estiver vazio, para tudo e mostra login
+if not st.session_state["logado"] or st.session_state["nome_colaborador"] == "":
     login()
     st.stop()
 
@@ -48,31 +49,31 @@ def load_data():
     if os.path.exists("avisos.csv"):
         try:
             df = pd.read_csv("avisos.csv")
-            # Verifica se a coluna Setor existe (caso o arquivo seja antigo)
             if "Setor" not in df.columns:
                 df["Setor"] = "Geral"
             return df
         except:
             return pd.DataFrame(columns=["Data", "Autor", "Setor", "Aviso"])
-    else:
-        return pd.DataFrame(columns=["Data", "Autor", "Setor", "Aviso"])
+    return pd.DataFrame(columns=["Data", "Autor", "Setor", "Aviso"])
 
 def save_data(df):
     df.to_csv("avisos.csv", index=False)
 
-# --- INTERFACE ---
-if st.sidebar.button("Sair"):
-    st.session_state["logado"] = False
-    st.session_state["perfil"] = None
-    st.rerun()
+# --- INTERFACE PRINCIPAL ---
+with st.sidebar:
+    st.write(f"👤 **{st.session_state['nome_colaborador']}**")
+    if st.button("Sair"):
+        st.session_state.clear() # Limpa tudo para forçar login na volta
+        st.rerun()
+    st.divider()
 
 st.title("📢 Mural de Avisos Digital")
-st.write(f"Bem-vindo, **{st.session_state['nome_colaborador']}**")
 
-# --- ÁREA DO MASTER ---
+# --- ÁREA DE POSTAGEM (APENAS MASTER) ---
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
     
+    # Nome automático e travado
     st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
     setor_selecionado = st.sidebar.selectbox("Setor Responsável", SETORES)
     texto_aviso = st.sidebar.text_area("Mensagem do aviso")
@@ -92,26 +93,11 @@ if st.session_state["perfil"] != "visitante":
             st.rerun()
         else:
             st.sidebar.error("Escreva a mensagem.")
+else:
+    st.sidebar.info("Modo Visualização")
 
 # --- EXIBIÇÃO ---
 st.subheader("Avisos Recentes")
 df_display = load_data()
 
-if not df_display.empty:
-    for i, row in df_display.iterrows():
-        with st.container():
-            col1, col2 = st.columns([0.85, 0.15])
-            with col1:
-                st.markdown(f"### {row['Autor']} | {row['Setor']}")
-                st.caption(f"Postado em: {row['Data']}")
-                st.info(row['Aviso'])
-            with col2:
-                if st.session_state["perfil"] != "visitante":
-                    st.write("")
-                    if st.button("🗑️", key=f"del_{i}"):
-                        df_novo = df_display.drop(i)
-                        save_data(df_novo)
-                        st.rerun()
-            st.divider()
-else:
-    st.write("Nenhum aviso no momento.")
+if not df
