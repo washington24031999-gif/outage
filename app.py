@@ -8,7 +8,7 @@ st.set_page_config(page_title="Sistema de Avisos", layout="centered")
 
 # Dicionário de Usuários: 'login': ['senha', 'Nome Completo']
 USUARIOS = {
-    "admin": ["master123", "Washington Silva"],
+    "admin": ["notgnihsaw", "Washington Muniz"],
     "joao_sup": ["master456", "João Souza"],
     "maria_adm": ["master789", "Maria Oliveira"],
     "visitante": ["ver123", "Visitante"]
