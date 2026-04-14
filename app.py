@@ -14,7 +14,7 @@ st.logo(URL_LOGO)
 USUARIOS = {
     "admin": ["master123", "Washington Muniz"],
     "victor melo": ["12345678", "Victor Melo"],
-    "visitante": ["ver123", "Visitante"]
+    "visitante": ["12345", "Visitante"]
 }
 
 SETORES = ["Sup. Campo", "Suporte", "Financeiro", "Administração", "Operacional"]
