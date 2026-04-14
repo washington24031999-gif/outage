@@ -20,7 +20,7 @@ USUARIOS = {
     "visitante": ["ver123", "Visitante"]
 }
 
-SETORES = ["Suporte", "Financeiro", "Administração", "Operacional", "Vendas"]
+SETORES = ["Suporte", "Financeiro", "Administração", "Operacional", "Vendas", "Sup. Campo"]
 
 # Inicializa variáveis de sessão de forma segura
 if "logado" not in st.session_state:
