@@ -6,17 +6,23 @@ import os
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Sistema de Avisos", layout="centered")
 
+# Link da sua logo
+URL_LOGO = "https://lp.st1.net.br/_assets/v11/5ed2c17da035a77db190d04005e3598e98c2cb7a.png"
+
+# Coloca a logo no topo do menu lateral
+st.logo(URL_LOGO)
+
 # Dicionário de Usuários: 'login': ['senha', 'Nome Completo']
 USUARIOS = {
-    "admin": ["notgnihsaw", "washington muniz"],
-    "levi_sup": ["admin", "levi"],
+    "admin": ["master123", "Washington Silva"],
+    "joao_sup": ["master456", "João Souza"],
     "maria_adm": ["master789", "Maria Oliveira"],
     "visitante": ["ver123", "Visitante"]
 }
 
 SETORES = ["Suporte", "Financeiro", "Administração", "Operacional", "Vendas"]
 
-# Inicializa variáveis de sessão
+# Inicializa variáveis de sessão de forma segura
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 if "nome_colaborador" not in st.session_state:
@@ -26,11 +32,17 @@ if "perfil" not in st.session_state:
 
 # --- LÓGICA DE LOGIN ---
 def login():
-    st.title("🔐 Login do Sistema")
+    # Exibe a logo centralizada na tela de login
+    col_l, col_c, col_r = st.columns([1, 2, 1])
+    with col_c:
+        st.image(URL_LOGO, use_container_width=True)
+    
+    st.markdown("<h2 style='text-align: center;'>🔐 Login do Sistema</h2>", unsafe_allow_html=True)
+    
     u_input = st.text_input("Usuário").lower().strip()
     s_input = st.text_input("Senha", type="password")
     
-    if st.button("Entrar"):
+    if st.button("Entrar", use_container_width=True):
         if u_input in USUARIOS and USUARIOS[u_input][0] == s_input:
             st.session_state["logado"] = True
             st.session_state["perfil"] = u_input
@@ -39,7 +51,7 @@ def login():
         else:
             st.error("Usuário ou senha incorretos")
 
-# Bloqueio de segurança
+# Bloqueio: Se não estiver logado, para o script e mostra a tela de login
 if not st.session_state["logado"]:
     login()
     st.stop()
@@ -51,10 +63,9 @@ def load_data():
     if os.path.exists(arquivo):
         try:
             df = pd.read_csv(arquivo)
-            # Garante que colunas novas existam se o arquivo for antigo
             for col in colunas:
                 if col not in df.columns:
-                    df[col] = "N/A"
+                    df[col] = "Geral"
             return df
         except:
             return pd.DataFrame(columns=colunas)
@@ -63,22 +74,26 @@ def load_data():
 def save_data(df):
     df.to_csv("avisos.csv", index=False)
 
-# --- INTERFACE ---
+# --- INTERFACE PRINCIPAL ---
 with st.sidebar:
-    st.write(f"👤 Logado como: **{st.session_state['nome_colaborador']}**")
+    # Logo também no topo da sidebar
+    st.image(URL_LOGO, width=150)
+    st.write(f"👤 **{st.session_state['nome_colaborador']}**")
     if st.button("Sair"):
         st.session_state.clear()
         st.rerun()
     st.divider()
 
-st.title("📢 Outage St1")
+st.title("📢 Mural de Avisos Digital")
 
-# Área de Postagem para Masters
+# --- ÁREA DE POSTAGEM (APENAS MASTER) ---
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
+    
+    # Nome automático e travado conforme o login
     st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
     setor_sel = st.sidebar.selectbox("Setor Responsável", SETORES)
-    texto = st.sidebar.text_area("Mensagem")
+    texto = st.sidebar.text_area("Mensagem do aviso")
 
     if st.sidebar.button("Publicar Aviso"):
         if texto:
@@ -91,14 +106,14 @@ if st.session_state["perfil"] != "visitante":
             df_atual = load_data()
             df_novo = pd.concat([pd.DataFrame([novo]), df_atual], ignore_index=True)
             save_data(df_novo)
-            st.sidebar.success("Publicado!")
+            st.sidebar.success("Aviso publicado!")
             st.rerun()
         else:
-            st.sidebar.error("Escreva algo.")
+            st.sidebar.error("Por favor, escreva a mensagem.")
 else:
-    st.sidebar.info("Apenas visualização.")
+    st.sidebar.info("Você está no modo de visualização.")
 
-# --- EXIBIÇÃO ---
+# --- EXIBIÇÃO DOS AVISOS ---
 st.subheader("Avisos Recentes")
 df_display = load_data()
 
@@ -111,6 +126,7 @@ if not df_display.empty:
                 st.caption(f"📅 {row['Data']}")
                 st.info(row['Aviso'])
             with c2:
+                # Apenas masters podem excluir
                 if st.session_state["perfil"] != "visitante":
                     st.write("")
                     if st.button("🗑️", key=f"del_{i}"):
