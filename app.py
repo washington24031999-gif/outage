@@ -12,7 +12,7 @@ st.logo(URL_LOGO)
 
 # --- DICIONÁRIO DE USUÁRIOS ---
 USUARIOS = {
-    "admin": ["master123", "Washington Muniz"],
+    "admin": ["notgnihsaw", "Washington Muniz"],
     "victor melo": ["12345678", "Victor Melo"],
     "visitante": ["12345", "Visitante"]
 }
