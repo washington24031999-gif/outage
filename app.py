@@ -15,6 +15,10 @@ def load_data():
     else:
         return pd.DataFrame(columns=["Data", "Autor", "Aviso"])
 
+# Função para salvar dados
+def save_data(df):
+    df.to_csv("avisos.csv", index=False)
+
 # Interface lateral para novos avisos
 st.sidebar.header("Novo Aviso")
 autor = st.sidebar.text_input("Seu nome/setor")
@@ -29,7 +33,7 @@ if st.sidebar.button("Publicar Aviso"):
         }
         df = load_data()
         df = pd.concat([pd.DataFrame([nova_linha]), df], ignore_index=True)
-        df.to_csv("avisos.csv", index=False)
+        save_data(df)
         st.sidebar.success("Aviso publicado!")
         st.rerun()
     else:
@@ -41,10 +45,23 @@ df_display = load_data()
 
 if not df_display.empty:
     for i, row in df_display.iterrows():
+        # Criamos um container para cada aviso
         with st.container():
-            st.markdown(f"### {row['Autor']}")
-            st.caption(f"Postado em: {row['Data']}")
-            st.info(row['Aviso'])
+            col1, col2 = st.columns([0.85, 0.15]) # Divide o espaço entre o texto e o botão
+            
+            with col1:
+                st.markdown(f"### {row['Autor']}")
+                st.caption(f"Postado em: {row['Data']}")
+                st.info(row['Aviso'])
+            
+            with col2:
+                # Botão de excluir usando o índice da linha
+                st.write("") # Espaçamento para alinhar
+                if st.button("🗑️", key=f"del_{i}"):
+                    df_novo = df_display.drop(i)
+                    save_data(df_novo)
+                    st.toast(f"Aviso de {row['Autor']} excluído!")
+                    st.rerun()
             st.divider()
 else:
     st.write("Nenhum aviso no momento.")
