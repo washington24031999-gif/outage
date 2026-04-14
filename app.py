@@ -10,16 +10,16 @@ st.set_page_config(page_title="Sistema de Avisos", layout="centered")
 URL_LOGO = "https://lp.st1.net.br/_assets/v11/5ed2c17da035a77db190d04005e3598e98c2cb7a.png"
 st.logo(URL_LOGO)
 
-# --- DICIONÁRIO DE USUÁRIOS ATUALIZADO ---
+# --- DICIONÁRIO DE USUÁRIOS ---
 USUARIOS = {
-    "admin": ["notgnihsaw", "washington muniz"],
-    "victor melo": ["12345678", "victor melo"],  # Novo usuário adicionado
+    "admin": ["master123", "Washington Muniz"],
+    "victor melo": ["12345678", "Victor Melo"],
     "visitante": ["ver123", "Visitante"]
 }
 
 SETORES = ["Sup. Campo", "Suporte", "Financeiro", "Administração", "Operacional"]
 
-# Inicializa variáveis de sessão
+# Inicializa variáveis de sessão de forma segura
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 if "nome_colaborador" not in st.session_state:
@@ -50,20 +50,22 @@ if not st.session_state["logado"]:
     login()
     st.stop()
 
-# --- FUNÇÕES DE DADOS ---
+# --- FUNÇÕES DE DADOS (CORRIGIDA PARA EVITAR ERROS DE COLUNA) ---
 def load_data():
     arquivo = "avisos.csv"
-    colunas = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
+    colunas_obrigatorias = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
+    
     if os.path.exists(arquivo):
         try:
             df = pd.read_csv(arquivo)
-            for col in colunas:
+            # Verifica e adiciona cada coluna faltante
+            for col in colunas_obrigatorias:
                 if col not in df.columns:
                     df[col] = "Pendente" if col == "Status" else ""
             return df
         except:
-            return pd.DataFrame(columns=colunas)
-    return pd.DataFrame(columns=colunas)
+            return pd.DataFrame(columns=colunas_obrigatorias)
+    return pd.DataFrame(columns=colunas_obrigatorias)
 
 def save_data(df):
     df.to_csv("avisos.csv", index=False)
@@ -79,7 +81,7 @@ with st.sidebar:
 
 st.title("📢 Mural de Avisos Digital")
 
-# --- ÁREA DE POSTAGEM (MASTERS) ---
+# --- ÁREA DE POSTAGEM ---
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
     st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
@@ -108,7 +110,7 @@ df_display = load_data()
 
 if not df_display.empty:
     for i, row in df_display.iterrows():
-        is_resolvido = row["Status"] == "Resolvido"
+        is_resolvido = str(row["Status"]) == "Resolvido"
         
         with st.container():
             c1, c2 = st.columns([0.80, 0.20])
@@ -125,15 +127,16 @@ if not df_display.empty:
             with c2:
                 if st.session_state["perfil"] != "visitante":
                     st.write("")
-                    # Botão para Resolver
+                    # Botão Resolvido
                     if not is_resolvido:
                         if st.button("✅", key=f"res_{i}", help="Marcar como Resolvido"):
-                            df_display.at[i, "Status"] = "Resolvido"
-                            df_display.at[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {datetime.now().strftime('%d/%m %H:%M')}"
+                            # Usamos o .loc para garantir que a gravação funcione mesmo se a coluna for nova
+                            df_display.loc[i, "Status"] = "Resolvido"
+                            df_display.loc[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {datetime.now().strftime('%d/%m %H:%M')}"
                             save_data(df_display)
                             st.rerun()
                     
-                    # Botão para Excluir
+                    # Botão Excluir
                     if st.button("🗑️", key=f"del_{i}", help="Excluir Aviso"):
                         df_res = df_display.drop(i)
                         save_data(df_res)
