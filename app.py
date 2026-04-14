@@ -6,11 +6,10 @@ import os
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Sistema de Avisos", layout="centered")
 
-# Link da logo
 URL_LOGO = "https://lp.st1.net.br/_assets/v11/5ed2c17da035a77db190d04005e3598e98c2cb7a.png"
 st.logo(URL_LOGO)
 
-# --- DICIONÁRIO DE USUÁRIOS ---
+# --- USUÁRIOS ---
 USUARIOS = {
     "admin": ["master123", "Washington Muniz"],
     "victor melo": ["12345678", "Victor Melo"],
@@ -19,7 +18,6 @@ USUARIOS = {
 
 SETORES = ["Sup. Campo", "Suporte", "Financeiro", "Administração", "Operacional"]
 
-# Inicializa variáveis de sessão de forma segura
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 if "nome_colaborador" not in st.session_state:
@@ -27,16 +25,14 @@ if "nome_colaborador" not in st.session_state:
 if "perfil" not in st.session_state:
     st.session_state["perfil"] = None
 
-# --- LÓGICA DE LOGIN ---
+# --- LOGIN ---
 def login():
     col_l, col_c, col_r = st.columns([1, 2, 1])
     with col_c:
         st.image(URL_LOGO, use_container_width=True)
     st.markdown("<h2 style='text-align: center;'>🔐 Login do Sistema</h2>", unsafe_allow_html=True)
-    
     u_input = st.text_input("Usuário").lower().strip()
     s_input = st.text_input("Senha", type="password")
-    
     if st.button("Entrar", use_container_width=True):
         if u_input in USUARIOS and USUARIOS[u_input][0] == s_input:
             st.session_state["logado"] = True
@@ -50,15 +46,15 @@ if not st.session_state["logado"]:
     login()
     st.stop()
 
-# --- FUNÇÕES DE DADOS (CORRIGIDA PARA EVITAR ERROS DE COLUNA) ---
+# --- DADOS (COM CORREÇÃO DE DTYPE) ---
 def load_data():
     arquivo = "avisos.csv"
     colunas_obrigatorias = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
     
     if os.path.exists(arquivo):
         try:
-            df = pd.read_csv(arquivo)
-            # Verifica e adiciona cada coluna faltante
+            # Forçamos todas as colunas a serem lidas como STRING (object)
+            df = pd.read_csv(arquivo, dtype=str).fillna("")
             for col in colunas_obrigatorias:
                 if col not in df.columns:
                     df[col] = "Pendente" if col == "Status" else ""
@@ -68,9 +64,10 @@ def load_data():
     return pd.DataFrame(columns=colunas_obrigatorias)
 
 def save_data(df):
-    df.to_csv("avisos.csv", index=False)
+    # Garantimos que tudo seja salvo como string para evitar erros na próxima leitura
+    df.astype(str).to_csv("avisos.csv", index=False)
 
-# --- INTERFACE PRINCIPAL ---
+# --- INTERFACE ---
 with st.sidebar:
     st.image(URL_LOGO, width=150)
     st.write(f"👤 **{st.session_state['nome_colaborador']}**")
@@ -81,7 +78,6 @@ with st.sidebar:
 
 st.title("📢 Mural de Avisos Digital")
 
-# --- ÁREA DE POSTAGEM ---
 if st.session_state["perfil"] != "visitante":
     st.sidebar.header("📝 Novo Aviso")
     st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
@@ -101,7 +97,6 @@ if st.session_state["perfil"] != "visitante":
             df_atual = load_data()
             df_novo = pd.concat([pd.DataFrame([novo]), df_atual], ignore_index=True)
             save_data(df_novo)
-            st.sidebar.success("Aviso publicado!")
             st.rerun()
 
 # --- EXIBIÇÃO ---
@@ -110,7 +105,9 @@ df_display = load_data()
 
 if not df_display.empty:
     for i, row in df_display.iterrows():
-        is_resolvido = str(row["Status"]) == "Resolvido"
+        # Verificação robusta do status
+        status_atual = str(row["Status"]).strip()
+        is_resolvido = status_atual == "Resolvido"
         
         with st.container():
             c1, c2 = st.columns([0.80, 0.20])
@@ -127,17 +124,16 @@ if not df_display.empty:
             with c2:
                 if st.session_state["perfil"] != "visitante":
                     st.write("")
-                    # Botão Resolvido
                     if not is_resolvido:
-                        if st.button("✅", key=f"res_{i}", help="Marcar como Resolvido"):
-                            # Usamos o .loc para garantir que a gravação funcione mesmo se a coluna for nova
-                            df_display.loc[i, "Status"] = "Resolvido"
-                            df_display.loc[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {datetime.now().strftime('%d/%m %H:%M')}"
+                        if st.button("✅", key=f"res_{i}"):
+                            # Forçamos a conversão do DF para garantir que aceite texto
+                            df_display = df_display.astype(object)
+                            df_display.at[i, "Status"] = "Resolvido"
+                            df_display.at[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {datetime.now().strftime('%d/%m %H:%M')}"
                             save_data(df_display)
                             st.rerun()
                     
-                    # Botão Excluir
-                    if st.button("🗑️", key=f"del_{i}", help="Excluir Aviso"):
+                    if st.button("🗑️", key=f"del_{i}"):
                         df_res = df_display.drop(i)
                         save_data(df_res)
                         st.rerun()
