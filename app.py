@@ -73,31 +73,39 @@ if st.button("SAIR"):
 st.markdown("---")
 st.write("# 📢 OUTAGE ST1")
 
+# Trava de permissão para Visitante
+eh_visitante = st.session_state["user_id"] == "visitante"
+
 col_in, col_out = st.columns([1, 2])
 
 with col_in:
     st.write("### EDITAR ALARME" if st.session_state["edit_index"] is not None else "### ENTRADA DE DADOS")
     st.text_input("SETOR:", value=st.session_state['setor_colaborador'], disabled=True)
-    msg = st.text_area("MENSAGEM:", value=st.session_state["edit_text"])
     
-    col_btn1, col_btn2 = st.columns(2)
-    if st.session_state["edit_index"] is not None:
-        if col_btn1.button("SALVAR ALTERAÇÃO"):
-            df = load_data()
-            df.at[st.session_state["edit_index"], "Aviso"] = msg
-            save_data(df)
-            st.session_state["edit_index"], st.session_state["edit_text"] = None, ""
-            st.rerun()
-        if col_btn2.button("CANCELAR"):
-            st.session_state["edit_index"], st.session_state["edit_text"] = None, ""
-            st.rerun()
-    else:
-        if st.button("SALVAR NO DISCO"):
-            if msg:
-                novo = {"Data": get_brasilia_time().strftime("%d/%m/%Y %H:%M"), "Autor": st.session_state['nome_colaborador'], 
-                        "Setor": st.session_state['setor_colaborador'], "Aviso": msg, "Status": "Pendente", "Resolvido_Por": ""}
-                save_data(pd.concat([pd.DataFrame([novo]), load_data()], ignore_index=True))
+    # Campo desabilitado para visitante
+    msg = st.text_area("MENSAGEM:", value=st.session_state["edit_text"], disabled=eh_visitante)
+    
+    if not eh_visitante:
+        col_btn1, col_btn2 = st.columns(2)
+        if st.session_state["edit_index"] is not None:
+            if col_btn1.button("SALVAR ALTERAÇÃO"):
+                df = load_data()
+                df.at[st.session_state["edit_index"], "Aviso"] = msg
+                save_data(df)
+                st.session_state["edit_index"], st.session_state["edit_text"] = None, ""
                 st.rerun()
+            if col_btn2.button("CANCELAR"):
+                st.session_state["edit_index"], st.session_state["edit_text"] = None, ""
+                st.rerun()
+        else:
+            if st.button("SALVAR NO DISCO"):
+                if msg:
+                    novo = {"Data": get_brasilia_time().strftime("%d/%m/%Y %H:%M"), "Autor": st.session_state['nome_colaborador'], 
+                            "Setor": st.session_state['setor_colaborador'], "Aviso": msg, "Status": "Pendente", "Resolvido_Por": ""}
+                    save_data(pd.concat([pd.DataFrame([novo]), load_data()], ignore_index=True))
+                    st.rerun()
+    else:
+        st.info("Acesso somente leitura. Você não pode publicar ou editar avisos.")
 
 with col_out:
     df_all = load_data()
@@ -105,53 +113,60 @@ with col_out:
     df_p = df_all[df_all["Status"] == "Pendente"].copy()
     
     if not df_p.empty:
-        if st.session_state["user_id"] != "visitante":
-            with st.expander("🛠️ AÇÕES EM MASSA"):
-                selecionados = []
+        # Ações em massa ocultas para visitante
+        if not eh_visitante:
+            with st.expander("🛠️ AÇÕES EM MASSA (PENDENTES)"):
+                selecionados_p = []
                 for i, row in df_p.iterrows():
-                    if st.checkbox(f"{row['Data']} - {row['Aviso'][:30]}...", key=f"ch_{i}"): selecionados.append(i)
-                if selecionados and st.button(f"RESOLVER {len(selecionados)} SELECIONADOS"):
-                    for idx in selecionados:
+                    if st.checkbox(f"{row['Data']} - {row['Aviso'][:30]}...", key=f"ch_p_{i}"): selecionados_p.append(i)
+                if selecionados_p and st.button(f"RESOLVER {len(selecionados_p)} SELECIONADOS"):
+                    for idx in selecionados_p:
                         df_all.at[idx, "Status"] = "Resolvido"
                         df_all.at[idx, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} (Lote)"
-                    save_data(df_all)
-                    st.rerun()
+                    save_data(df_all); st.rerun()
 
         for i, row in df_p.iterrows():
             st.markdown(f'<div class="aviso-box"><div class="aviso-header"><span class="status-pendente">PENDENTE</span> {row["Data"]} | AUTOR: {row["Autor"]}</div>{row["Aviso"]}</div>', unsafe_allow_html=True)
-            c_res, c_edit, c_del = st.columns([0.3, 0.3, 0.4])
-            if c_res.button("RESOLVER", key=f"r_{i}"):
-                df_all.at[i, "Status"] = "Resolvido"
-                df_all.at[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {get_brasilia_time().strftime('%H:%M')}"
-                save_data(df_all)
-                st.rerun()
-            if c_edit.button("EDITAR", key=f"e_{i}"):
-                st.session_state["edit_index"], st.session_state["edit_text"] = i, row["Aviso"]
-                st.rerun()
-            if c_del.button("EXCLUIR", key=f"d_{i}"):
-                save_data(df_all.drop(i)); st.rerun()
+            
+            # Botões de ação ocultos para visitante
+            if not eh_visitante:
+                c_res, c_edit, c_del = st.columns([0.3, 0.3, 0.4])
+                if c_res.button("RESOLVER", key=f"r_{i}"):
+                    df_all.at[i, "Status"] = "Resolvido"; df_all.at[i, "Resolvido_Por"] = st.session_state['nome_colaborador']
+                    save_data(df_all); st.rerun()
+                if c_edit.button("EDITAR", key=f"e_{i}"):
+                    st.session_state["edit_index"], st.session_state["edit_text"] = i, row["Aviso"]; st.rerun()
+                if c_del.button("EXCLUIR", key=f"d_{i}"):
+                    save_data(df_all.drop(i)); st.rerun()
     else: st.write("Nenhuma pendência.")
 
     st.markdown("---")
     c_h1, c_h2 = st.columns([0.7, 0.3])
     c_h1.write("### ARQUIVO HISTORICO")
     if c_h2.button("OCULTAR / EXIBIR"):
-        st.session_state["mostrar_historico"] = not st.session_state["mostrar_historico"]
-        st.rerun()
+        st.session_state["mostrar_historico"] = not st.session_state["mostrar_historico"]; st.rerun()
 
     if st.session_state["mostrar_historico"]:
-        # BOTÃO EXCLUSIVO PARA ADMIN
-        if st.session_state["user_id"] == "admin":
-            st.markdown('<div class="btn-perigo">', unsafe_allow_html=True)
-            if st.button("⚠️ EXCLUIR TODO O HISTÓRICO (DEFINITIVO)"):
-                df_final = df_all[df_all["Status"] == "Pendente"]
-                save_data(df_final)
-                st.rerun()
-            st.markdown('</div>', unsafe_allow_html=True)
+        df_r = df_all[df_all["Status"] == "Resolvido"].copy()
+        
+        # Limpeza restrita ao Admin
+        if st.session_state["user_id"] == "admin" and not df_r.empty:
+            with st.expander("🗑️ LIMPEZA DE HISTÓRICO"):
+                st.markdown('<div class="btn-perigo">', unsafe_allow_html=True)
+                if st.button("⚠️ APAGAR TODO O HISTÓRICO"):
+                    save_data(df_all[df_all["Status"] == "Pendente"]); st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                selecionados_h = []
+                for i, row in df_r.head(100).iterrows():
+                    if st.checkbox(f"Apagar: {row['Data']}", key=f"ch_h_{i}"): selecionados_h.append(i)
+                if selecionados_h and st.button(f"APAGAR {len(selecionados_h)} SELECIONADOS"):
+                    save_data(df_all.drop(selecionados_h)); st.rerun()
 
-        df_r = df_all[df_all["Status"] == "Resolvido"].head(1000)
-        for i, row in df_r.iterrows():
-            with st.expander(f"OK: {row['Resolvido_Por']}"):
-                st.write(f"**Mensagem:** {row['Aviso']}")
-                if st.button("APAGAR", key=f"del_h_{i}"):
-                    save_data(df_all.drop(i)); st.rerun()
+        for i, row in df_r.head(1000).iterrows():
+            with st.expander(f"OK: {row['Resolvido_Por']} | SETOR: {row['Setor']}"):
+                st.write(row["Aviso"])
+                # Visitante não pode apagar itens do histórico
+                if not eh_visitante:
+                    if st.button("APAGAR", key=f"del_h_{i}"):
+                        save_data(df_all.drop(i)); st.rerun()
