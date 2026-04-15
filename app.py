@@ -10,7 +10,7 @@ st.set_page_config(page_title="Outage St1", layout="wide")
 URL_LOGO = "https://lp.st1.net.br/_assets/v11/5ed2c17da035a77db190d04005e3598e98c2cb7a.png"
 st.logo(URL_LOGO)
 
-# CSS para visual limpo e retrô
+# CSS para visual limpo e retrô (sem colchetes ou sublinhados)
 st.markdown("""
     <style>
     * { border-radius: 0px !important; }
@@ -25,7 +25,7 @@ st.markdown("""
 
 # --- USUÁRIOS E SETORES FIXOS ---
 USUARIOS = {
-    "admin": ["notgnihsaw", "Washington Muniz", "Supervisor de Campo"], # Setor atualizado aqui
+    "admin": ["notgnihsaw", "Washington Muniz", "Supervisor de Campo"],
     "victor melo": ["12345678", "Victor Melo", "Suporte"],
     "visitante": ["ver123", "Visitante", "Operacional"]
 }
@@ -64,6 +64,7 @@ def load_data():
     cols = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
     if os.path.exists(arquivo):
         try:
+            # Carrega todo o arquivo CSV para processamento
             return pd.read_csv(arquivo, dtype=str).fillna("")
         except:
             return pd.DataFrame(columns=cols)
@@ -85,7 +86,6 @@ col_in, col_out = st.columns([1, 2])
 
 with col_in:
     st.write("### ENTRADA DE DADOS")
-    # Campo de setor travado para edição
     st.text_input("SETOR ALVO:", value=st.session_state['setor_colaborador'], disabled=True)
     msg = st.text_area("DESCRICAO LOG:")
     if st.button("SALVAR NO DISCO"):
@@ -105,8 +105,10 @@ with col_in:
 
 with col_out:
     df_all = load_data()
+    
+    # --- LOGS ATIVOS (Ajustado para exibir até 100) ---
     st.write("### LOGS ATIVOS")
-    df_p = df_all[df_all["Status"] == "Pendente"]
+    df_p = df_all[df_all["Status"] == "Pendente"].head(100)
     
     if not df_p.empty:
         for i, row in df_p.iterrows():
@@ -133,16 +135,24 @@ with col_out:
         st.write("> NENHUMA PENDENCIA ENCONTRADA.")
 
     st.markdown("---")
+    
+    # --- ARQUIVO HISTORICO (Ajustado para exibir até 1000) ---
     st.write("### ARQUIVO HISTORICO")
-    df_r = df_all[df_all["Status"] == "Resolvido"].head(10)
-    for i, row in df_r.iterrows():
-        st.markdown(f"""
-        <div class="aviso-box" style="background-color: #f9f9f9; border: 1px dashed #999;">
-            <div class="aviso-header">
-                <span class="status-resolvido">RESOLVIDO POR:</span> {row['Resolvido_Por']}
-            </div>
-            <b>AUTOR ORIGINAL:</b> {row['Autor']}<br>
-            <b>SETOR:</b> {row['Setor']}<br>
-            <b>MSG:</b> {row['Aviso']}
-        </div>
-        """, unsafe_allow_html=True)
+    df_r = df_all[df_all["Status"] == "Resolvido"].head(1000)
+    
+    if not df_r.empty:
+        for i, row in df_r.iterrows():
+            # Uso de expander para não poluir a tela com 1000 registros abertos
+            with st.expander(f"RESOLVIDO POR: {row['Resolvido_Por']}"):
+                st.markdown(f"""
+                <div class="aviso-box" style="background-color: #f9f9f9; border: 1px dashed #999;">
+                    <b>AUTOR ORIGINAL:</b> {row['Autor']}<br>
+                    <b>SETOR:</b> {row['Setor']}<br>
+                    <b>MSG:</b> {row['Aviso']}
+                </div>
+                """, unsafe_allow_html=True)
+                if st.button("EXCLUIR DEFINITIVAMENTE", key=f"del_hist_{i}"):
+                    save_data(df_all.drop(i))
+                    st.rerun()
+    else:
+        st.write("> HISTORICO VAZIO.")
