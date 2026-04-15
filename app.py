@@ -3,96 +3,87 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(page_title="Outage St1", layout="centered")
+# --- CONFIGURAÇÃO DA PÁGINA (ESTILO RETRÔ) ---
+st.set_page_config(page_title="Outage St1", layout="wide")
 
-# Link da logo
-URL_LOGO = "https://lp.st1.net.br/_assets/v11/5ed2c17da035a77db190d04005e3598e98c2cb7a.png"
-st.logo(URL_LOGO)
+# CSS para forçar visual de sistema antigo (bordas retas, fontes mono, sem frescuras)
+st.markdown("""
+    <style>
+    /* Remove arredondamentos e sombras */
+    * { border-radius: 0px !important; }
+    .stButton>button { border: 1px solid #333; background: #f0f0f0; color: black; font-family: monospace; }
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea { border: 1px solid #333 !important; font-family: monospace; }
+    /* Estilo de tabela antiga para avisos */
+    .aviso-box { border: 1px solid #000; padding: 10px; margin-bottom: 5px; background-color: #fff; color: #000; font-family: monospace; }
+    .aviso-header { border-bottom: 1px solid #000; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+    .status-pendente { color: #d00; }
+    .status-resolvido { color: #008000; }
+    </style>
+""", unsafe_allow_html=True)
 
-# --- DICIONÁRIO DE USUÁRIOS ---
+# --- USUÁRIOS ---
 USUARIOS = {
-    "admin": ["notgnihsaw", "Washington Muniz"],
+    "admin": ["master123", "Washington Muniz"],
     "victor melo": ["12345678", "Victor Melo"],
-    "visitante": ["12345", "Visitante"]
+    "visitante": ["ver123", "Visitante"]
 }
 
 SETORES = ["Sup. Campo", "Suporte", "Financeiro", "Administração", "Operacional"]
 
-# Inicialização de variáveis de sessão
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 if "nome_colaborador" not in st.session_state:
     st.session_state["nome_colaborador"] = ""
-if "perfil" not in st.session_state:
-    st.session_state["perfil"] = None
 
-# --- FUNÇÃO PARA PEGAR HORA DE BRASÍLIA ---
 def get_brasilia_time():
-    # Ajusta para UTC-3 (Horário de Brasília)
     return datetime.utcnow() - timedelta(hours=3)
 
-# --- LÓGICA DE LOGIN ---
-def login():
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
-        st.image(URL_LOGO, use_container_width=True)
-    st.markdown("<h2 style='text-align: center;'>🔐 Login do Sistema</h2>", unsafe_allow_html=True)
-    
-    u_input = st.text_input("Usuário").lower().strip()
-    s_input = st.text_input("Senha", type="password")
-    
-    if st.button("Entrar", use_container_width=True):
-        if u_input in USUARIOS and USUARIOS[u_input][0] == s_input:
+# --- LOGIN ---
+if not st.session_state["logado"]:
+    st.write("### [ LOGIN SYSTEM ]")
+    u = st.text_input("USER:").lower().strip()
+    p = st.text_input("PASS:", type="password")
+    if st.button("EXECUTE LOGIN"):
+        if u in USUARIOS and USUARIOS[u][0] == p:
             st.session_state["logado"] = True
-            st.session_state["perfil"] = u_input
-            st.session_state["nome_colaborador"] = USUARIOS[u_input][1]
+            st.session_state["nome_colaborador"] = USUARIOS[u][1]
             st.rerun()
         else:
-            st.error("Usuário ou senha incorretos")
-
-if not st.session_state["logado"]:
-    login()
+            st.error("ACCESS DENIED")
     st.stop()
 
-# --- FUNÇÕES DE DADOS ---
+# --- DADOS ---
 def load_data():
     arquivo = "avisos.csv"
-    colunas_obrigatorias = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
+    cols = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
     if os.path.exists(arquivo):
         try:
-            # Força leitura como string para evitar erros de tipo
             df = pd.read_csv(arquivo, dtype=str).fillna("")
-            for col in colunas_obrigatorias:
-                if col not in df.columns:
-                    df[col] = "Pendente" if col == "Status" else ""
             return df
         except:
-            return pd.DataFrame(columns=colunas_obrigatorias)
-    return pd.DataFrame(columns=colunas_obrigatorias)
+            return pd.DataFrame(columns=cols)
+    return pd.DataFrame(columns=cols)
 
 def save_data(df):
     df.astype(str).to_csv("avisos.csv", index=False)
 
-# --- INTERFACE LATERAL ---
-with st.sidebar:
-    st.image(URL_LOGO, width=150)
-    st.write(f"👤 **{st.session_state['nome_colaborador']}**")
-    if st.button("Sair"):
-        st.session_state.clear()
-        st.rerun()
-    st.divider()
+# --- INTERFACE PRINCIPAL ---
+st.write(f"**SYS_USER:** {st.session_state['nome_colaborador']} | **LOC:** Terminal_01")
+if st.button("[ LOGOUT ]"):
+    st.session_state.clear()
+    st.rerun()
 
-# --- TÍTULO DO SISTEMA ---
-st.title("📢 Outage St1")
+st.markdown("---")
+st.write("# OUTAGE ST1 - MURAL DE OCORRÊNCIAS")
 
-# --- ÁREA DE POSTAGEM (APENAS NÃO-VISITANTES) ---
-if st.session_state["perfil"] != "visitante":
-    st.sidebar.header("📝 Novo Aviso")
-    setor_sel = st.sidebar.selectbox("Setor Responsável", SETORES)
-    texto = st.sidebar.text_area("Mensagem do aviso")
+# Lado a Lado: Entrada de dados e Mural
+col_input, col_mural = st.columns([1, 2])
 
-    if st.sidebar.button("Publicar Aviso"):
+with col_input:
+    st.write("### [ NOVO REGISTRO ]")
+    setor_sel = st.selectbox("SETOR:", SETORES)
+    texto = st.text_area("DESCRIÇÃO:")
+    if st.button("SALVAR NO BANCO"):
         if texto:
             novo = {
                 "Data": get_brasilia_time().strftime("%d/%m/%Y %H:%M"),
@@ -102,61 +93,52 @@ if st.session_state["perfil"] != "visitante":
                 "Status": "Pendente",
                 "Resolvido_Por": ""
             }
-            df_atual = load_data()
-            df_novo = pd.concat([pd.DataFrame([novo]), df_atual], ignore_index=True)
-            save_data(df_novo)
+            df = load_data()
+            df = pd.concat([pd.DataFrame([novo]), df], ignore_index=True)
+            save_data(df)
             st.rerun()
 
-# --- SISTEMA DE ABAS (MURAL vs HISTÓRICO) ---
-tab_mural, tab_historico = st.tabs(["📌 Avisos Ativos", "📂 Histórico (Resolvidos)"])
-
-df_all = load_data()
-
-# --- ABA 1: MURAL DE ATIVOS ---
-with tab_mural:
+with col_mural:
+    df_all = load_data()
+    
+    # Divisão simplificada em texto
+    st.write("### [ OCORRÊNCIAS ATIVAS ]")
     df_pendentes = df_all[df_all["Status"] == "Pendente"]
+    
     if not df_pendentes.empty:
         for i, row in df_pendentes.iterrows():
-            with st.container():
-                c1, c2 = st.columns([0.80, 0.20])
-                with c1:
-                    st.markdown(f"### ⏳ PENDENTE | {row['Setor']}")
-                    st.caption(f"📅 {row['Data']}")
-                    st.info(row['Aviso'])
-                with c2:
-                    if st.session_state["perfil"] != "visitante":
-                        st.write("")
-                        # Botão para resolver o aviso
-                        if st.button("✅", key=f"res_{i}", help="Marcar como resolvido"):
-                            df_all = df_all.astype(object) # Evita erro de tipo
-                            df_all.at[i, "Status"] = "Resolvido"
-                            df_all.at[i, "Resolvido_Por"] = get_brasilia_time().strftime("%d/%m/%Y %H:%M")
-                            save_data(df_all)
-                            st.rerun()
-                        # Botão para excluir
-                        if st.button("🗑️", key=f"del_{i}"):
-                            df_all = df_all.drop(i)
-                            save_data(df_all)
-                            st.rerun()
-                st.divider()
+            st.markdown(f"""
+            <div class="aviso-box">
+                <div class="aviso-header">
+                    <span class="status-pendente">[PENDENTE]</span> {row['Data']} | SETOR: {row['Setor']}
+                </div>
+                {row['Aviso']}
+            </div>
+            """, unsafe_allow_html=True)
+            
+            c_res, c_del, _ = st.columns([0.2, 0.2, 0.6])
+            if c_res.button("CHECK", key=f"res_{i}"):
+                df_all.loc[i, "Status"] = "Resolvido"
+                df_all.loc[i, "Resolvido_Por"] = get_brasilia_time().strftime("%d/%m/%Y %H:%M")
+                save_data(df_all)
+                st.rerun()
+            if c_del.button("DEL", key=f"del_{i}"):
+                save_data(df_all.drop(i))
+                st.rerun()
     else:
-        st.write("Não há avisos pendentes no momento.")
+        st.write("> NENHUMA PENDÊNCIA REGISTRADA.")
 
-# --- ABA 2: HISTÓRICO (SOMENTE DATA E HORA NO TÍTULO) ---
-with tab_historico:
-    df_resolvidos = df_all[df_all["Status"] == "Resolvido"]
+    st.markdown("---")
+    st.write("### [ ARQUIVO HISTÓRICO ]")
+    df_resolvidos = df_all[df_all["Status"] == "Resolvido"].head(10) # Mostra apenas os últimos 10 para ser leve
+    
     if not df_resolvidos.empty:
         for i, row in df_resolvidos.iterrows():
-            # Mostra apenas a data da resolução no título do expander
-            with st.expander(f"✅ Resolvido em {row['Resolvido_Por']} - {row['Setor']}"):
-                st.write(f"**Mensagem Original:**")
-                st.write(row['Aviso'])
-                st.caption(f"Postado originalmente em: {row['Data']}")
-                
-                if st.session_state["perfil"] != "visitante":
-                    if st.button("Excluir Permanentemente", key=f"del_hist_{i}"):
-                        df_all = df_all.drop(i)
-                        save_data(df_all)
-                        st.rerun()
-    else:
-        st.write("O histórico de resolvidos está vazio.")
+            st.markdown(f"""
+            <div class="aviso-box" style="background-color: #f9f9f9; border: 1px dashed #999;">
+                <div class="aviso-header">
+                    <span class="status-resolvido">[RESOLVIDO]</span> {row['Resolvido_Por']} | SETOR: {row['Setor']}
+                </div>
+                {row['Aviso']}
+            </div>
+            """, unsafe_allow_html=True)
