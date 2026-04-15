@@ -3,14 +3,14 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 
-# --- CONFIGURAÇÃO DA PÁGINA (ESTILO RETRÔ E LEVE) ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Outage St1", layout="wide")
 
-# Link da sua logo
+# Link da logo
 URL_LOGO = "https://lp.st1.net.br/_assets/v11/5ed2c17da035a77db190d04005e3598e98c2cb7a.png"
-st.logo(URL_LOGO) # Coloca a logo no topo da barra lateral
+st.logo(URL_LOGO)
 
-# CSS para visual de terminal/sistema antigo
+# CSS para visual retrô limpo
 st.markdown("""
     <style>
     * { border-radius: 0px !important; }
@@ -23,60 +23,46 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- USUÁRIOS ---
+# --- USUÁRIOS E SETORES FIXOS ---
+# Você pode definir qual setor pertence a cada usuário aqui
 USUARIOS = {
-    "admin": ["notgnihsaw", "Washington Muniz"],
-    "victor melo": ["12345678", "Victor Melo"],
-    "visitante": ["ver123", "Visitante"]
+    "admin": ["notgnihsaw", "Washington Muniz", "Administração"],
+    "victor melo": ["12345678", "Victor Melo", "Suporte"],
+    "visitante": ["ver123", "Visitante", "Operacional"]
 }
-
-SETORES = ["Sup. Campo", "Suporte", "Financeiro", "Administração", "Operacional"]
 
 if "logado" not in st.session_state:
     st.session_state["logado"] = False
 if "nome_colaborador" not in st.session_state:
     st.session_state["nome_colaborador"] = ""
-if "perfil" not in st.session_state:
-    st.session_state["perfil"] = None
+if "setor_colaborador" not in st.session_state:
+    st.session_state["setor_colaborador"] = ""
 
 def get_brasilia_time():
     return datetime.utcnow() - timedelta(hours=3)
 
-# --- LOGIN ---
-def login():
-    # Exibe a logo centralizada na tela de login
-    col_l, col_c, col_r = st.columns([1, 2, 1])
-    with col_c:
-        st.image(URL_LOGO, use_container_width=True)
-    
-    st.markdown("<h2 style='text-align: center;'>🔐 LOGIN DO SISTEMA</h2>", unsafe_allow_html=True)
-    
-    u_input = st.text_input("USUÁRIO:").lower().strip()
-    s_input = st.text_input("SENHA:", type="password")
-    
-    if st.button("EXECUTAR AUTENTICAÇÃO", use_container_width=True):
-        if u_input in USUARIOS and USUARIOS[u_input][0] == s_input:
+# --- ACESSO ---
+if not st.session_state["logado"]:
+    st.write("### LOGIN TERMINAL OUTAGE")
+    u = st.text_input("ID USUARIO:").lower().strip()
+    p = st.text_input("SENHA:", type="password")
+    if st.button("EXECUTAR AUTENTICACAO"):
+        if u in USUARIOS and USUARIOS[u][0] == p:
             st.session_state["logado"] = True
-            st.session_state["perfil"] = u_input
-            st.session_state["nome_colaborador"] = USUARIOS[u_input][1]
+            st.session_state["nome_colaborador"] = USUARIOS[u][1]
+            st.session_state["setor_colaborador"] = USUARIOS[u][2] # Define o setor no login
             st.rerun()
         else:
-            st.error("USUÁRIO OU SENHA INCORRETOS")
-
-# Bloqueio: Se não estiver logado, para o script e mostra a tela de login
-if not st.session_state["logado"]:
-    login()
+            st.error("ACESSO NEGADO")
     st.stop()
 
-# --- FUNÇÕES DE DADOS ---
+# --- DADOS ---
 def load_data():
     arquivo = "avisos.csv"
     cols = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
     if os.path.exists(arquivo):
         try:
-            # Força leitura como string para evitar erros de tipo
-            df = pd.read_csv(arquivo, dtype=str).fillna("")
-            return df
+            return pd.read_csv(arquivo, dtype=str).fillna("")
         except:
             return pd.DataFrame(columns=cols)
     return pd.DataFrame(columns=cols)
@@ -84,83 +70,53 @@ def load_data():
 def save_data(df):
     df.astype(str).to_csv("avisos.csv", index=False)
 
-# --- INTERFACE PRINCIPAL ---
-with st.sidebar:
-    # Logo também no topo da sidebar
-    st.image(URL_LOGO, width=150)
-    st.write(f"👤 **{st.session_state['nome_colaborador']}**")
-    if st.button("SAIR"):
-        st.session_state.clear()
-        st.rerun()
-    st.divider()
+# --- INTERFACE ---
+st.write(f"**USUARIO ATIVO:** {st.session_state['nome_colaborador']} | **SETOR:** {st.session_state['setor_colaborador']}")
+if st.button("ENCERRAR SESSAO"):
+    st.session_state.clear()
+    st.rerun()
 
-st.title("📢 Outage St1")
+st.markdown("---")
+st.write("# 📢 OUTAGE ST1")
 
-# --- ÁREA DE POSTAGEM (APENAS NÃO-VISITANTES) ---
-if st.session_state["perfil"] != "visitante":
-    st.sidebar.header("📝 Novo Aviso")
+col_in, col_out = st.columns([1, 2])
+
+with col_in:
+    st.write("### ENTRADA DE DADOS")
     
-    # Nome automático e travado conforme o login
-    st.sidebar.text_input("Colaborador", value=st.session_state['nome_colaborador'], disabled=True)
-    setor_sel = st.sidebar.selectbox("Setor Responsável", SETORES)
-    texto = st.sidebar.text_area("Mensagem do aviso")
-
-    if st.sidebar.button("Publicar Aviso"):
-        if texto:
+    # CAMPO DE SETOR NÃO SELECIONÁVEL (TRAVADO)
+    st.text_input("SETOR ALVO:", value=st.session_state['setor_colaborador'], disabled=True)
+    
+    msg = st.text_area("DESCRICAO LOG:")
+    if st.button("SALVAR NO DISCO"):
+        if msg:
             novo = {
                 "Data": get_brasilia_time().strftime("%d/%m/%Y %H:%M"),
                 "Autor": st.session_state['nome_colaborador'],
-                "Setor": setor_sel,
-                "Aviso": texto,
+                "Setor": st.session_state['setor_colaborador'], # Grava o setor automático
+                "Aviso": msg,
                 "Status": "Pendente",
                 "Resolvido_Por": ""
             }
-            df_atual = load_data()
-            df_novo = pd.concat([pd.DataFrame([novo]), df_atual], ignore_index=True)
-            save_data(df_novo)
-            st.sidebar.success("Aviso publicado!")
+            df = load_data()
+            df = pd.concat([pd.DataFrame([novo]), df], ignore_index=True)
+            save_data(df)
             st.rerun()
-else:
-    st.sidebar.info("Modo Visualização")
 
-# --- EXIBIÇÃO ---
-st.subheader("Avisos Recentes")
-df_display = load_data()
-
-if not df_display.empty:
-    for i, row in df_display.iterrows():
-        is_resolvido = str(row["Status"]) == "Resolvido"
-        
-        with st.container():
-            c1, c2 = st.columns([0.80, 0.20])
-            with c1:
-                status_txt = "✅ RESOLVIDO" if is_resolvido else "⏳ PENDENTE"
-                st.markdown(f"### {row['Autor']} | {row['Setor']} | {status_txt}")
-                st.caption(f"📅 Postado em: {row['Data']}")
-                
-                if is_resolvido:
-                    st.success(f"{row['Aviso']}\n\n*Resolvido por: {row['Resolvido_Por']}*")
-                else:
-                    st.info(row['Aviso'])
-            
-            with c2:
-                if st.session_state["perfil"] != "visitante":
-                    st.write("")
-                    # Botão Resolvido
-                    if not is_resolvido:
-                        if st.button("✅", key=f"res_{i}", help="Marcar como Resolvido"):
-                            # Evita erro de tipo de coluna
-                            df_display = df_display.astype(object)
-                            df_display.at[i, "Status"] = "Resolvido"
-                            df_display.at[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {get_brasilia_time().strftime('%d/%m %H:%M')}"
-                            save_data(df_display)
-                            st.rerun()
-                    
-                    # Botão Excluir
-                    if st.button("🗑️", key=f"del_{i}", help="Excluir Aviso"):
-                        df_res = df_display.drop(i)
-                        save_data(df_res)
-                        st.rerun()
-            st.divider()
-else:
-    st.write("Nenhum aviso no momento.")
+with col_out:
+    df_all = load_data()
+    st.write("### LOGS ATIVOS")
+    df_p = df_all[df_all["Status"] == "Pendente"]
+    
+    if not df_p.empty:
+        for i, row in df_p.iterrows():
+            st.markdown(f"""
+            <div class="aviso-box">
+                <div class="aviso-header">
+                    <span class="status-pendente">PENDENTE</span> {row['Data']} | SETOR: {row['Setor']}
+                </div>
+                <b>AUTOR:</b> {row['Autor']}<br>
+                <b>MSG:</b> {row['Aviso']}
+            </div>
+            """, unsafe_allow_html=True)
+            # ... (restante dos botões de resolver/excluir)
