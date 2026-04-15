@@ -3,10 +3,10 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 
-# --- CONFIGURAÇÃO DA PÁGINA (ESTILO RETRÔ E LEVE) ---
+# --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Outage St1", layout="wide")
 
-# CSS para visual limpo sem arredondamentos
+# CSS para visual retrô limpo
 st.markdown("""
     <style>
     * { border-radius: 0px !important; }
@@ -19,7 +19,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- DICIONÁRIO DE USUÁRIOS ---
+# --- USUÁRIOS ---
 USUARIOS = {
     "admin": ["notgnihsaw", "Washington Muniz"],
     "victor melo": ["12345678", "Victor Melo"],
@@ -36,7 +36,7 @@ if "nome_colaborador" not in st.session_state:
 def get_brasilia_time():
     return datetime.utcnow() - timedelta(hours=3)
 
-# --- SISTEMA DE ACESSO ---
+# --- ACESSO ---
 if not st.session_state["logado"]:
     st.write("### LOGIN TERMINAL OUTAGE")
     u = st.text_input("ID USUARIO:").lower().strip()
@@ -47,17 +47,16 @@ if not st.session_state["logado"]:
             st.session_state["nome_colaborador"] = USUARIOS[u][1]
             st.rerun()
         else:
-            st.error("ACESSO NEGADO: CREDENCIAIS INVALIDAS")
+            st.error("ACESSO NEGADO")
     st.stop()
 
-# --- CARREGAMENTO DE DADOS ---
+# --- DADOS ---
 def load_data():
     arquivo = "avisos.csv"
     cols = ["Data", "Autor", "Setor", "Aviso", "Status", "Resolvido_Por"]
     if os.path.exists(arquivo):
         try:
-            df = pd.read_csv(arquivo, dtype=str).fillna("")
-            return df
+            return pd.read_csv(arquivo, dtype=str).fillna("")
         except:
             return pd.DataFrame(columns=cols)
     return pd.DataFrame(columns=cols)
@@ -65,8 +64,8 @@ def load_data():
 def save_data(df):
     df.astype(str).to_csv("avisos.csv", index=False)
 
-# --- INTERFACE PRINCIPAL ---
-st.write(f"**USUARIO ATIVO:** {st.session_state['nome_colaborador']} | **PORTA:** 8501")
+# --- INTERFACE ---
+st.write(f"**USUARIO ATIVO:** {st.session_state['nome_colaborador']}")
 if st.button("ENCERRAR SESSAO"):
     st.session_state.clear()
     st.rerun()
@@ -74,19 +73,19 @@ if st.button("ENCERRAR SESSAO"):
 st.markdown("---")
 st.write("# 📢 OUTAGE ST1")
 
-col_input, col_mural = st.columns([1, 2])
+col_in, col_out = st.columns([1, 2])
 
-with col_input:
+with col_in:
     st.write("### ENTRADA DE DADOS")
-    setor_sel = st.selectbox("SETOR ALVO:", SETORES)
-    texto = st.text_area("DESCRICAO LOG:")
+    setor = st.selectbox("SETOR ALVO:", SETORES)
+    msg = st.text_area("DESCRICAO LOG:")
     if st.button("SALVAR NO DISCO"):
-        if texto:
+        if msg:
             novo = {
                 "Data": get_brasilia_time().strftime("%d/%m/%Y %H:%M"),
-                "Autor": st.session_state['nome_colaborador'],
-                "Setor": setor_sel,
-                "Aviso": texto,
+                "Autor": st.session_state['nome_colaborador'], # Registro automático do autor
+                "Setor": setor,
+                "Aviso": msg,
                 "Status": "Pendente",
                 "Resolvido_Por": ""
             }
@@ -95,47 +94,46 @@ with col_input:
             save_data(df)
             st.rerun()
 
-with col_mural:
+with col_out:
     df_all = load_data()
-    
     st.write("### LOGS ATIVOS")
-    df_pendentes = df_all[df_all["Status"] == "Pendente"]
+    df_p = df_all[df_all["Status"] == "Pendente"]
     
-    if not df_pendentes.empty:
-        for i, row in df_pendentes.iterrows():
+    if not df_p.empty:
+        for i, row in df_p.iterrows():
             st.markdown(f"""
             <div class="aviso-box">
                 <div class="aviso-header">
                     <span class="status-pendente">PENDENTE</span> {row['Data']} | SETOR: {row['Setor']}
                 </div>
-                {row['Aviso']}
+                <b>AUTOR:</b> {row['Autor']}<br>
+                <b>MSG:</b> {row['Aviso']}
             </div>
             """, unsafe_allow_html=True)
-            
-            c_res, c_del, _ = st.columns([0.2, 0.2, 0.6])
-            if c_res.button("RESOLVER", key=f"res_{i}"):
-                df_all = df_all.astype(object)
-                df_all.loc[i, "Status"] = "Resolvido"
-                df_all.loc[i, "Resolvido_Por"] = get_brasilia_time().strftime("%d/%m/%Y %H:%M")
+            c1, c2, _ = st.columns([0.2, 0.2, 0.6])
+            if c1.button("RESOLVER", key=f"r_{i}"):
+                df_all.at[i, "Status"] = "Resolvido"
+                df_all.at[i, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} em {get_brasilia_time().strftime('%d/%m/%Y %H:%M')}"
                 save_data(df_all)
                 st.rerun()
-            if c_del.button("EXCLUIR", key=f"del_{i}"):
+            if c2.button("EXCLUIR", key=f"d_{i}"):
                 save_data(df_all.drop(i))
                 st.rerun()
     else:
-        st.write("> NENHUMA PENDENCIA ENCONTRADA.")
+        st.write("> NENHUMA PENDENCIA.")
 
     st.markdown("---")
     st.write("### ARQUIVO HISTORICO")
-    df_resolvidos = df_all[df_all["Status"] == "Resolvido"].head(10)
-    
-    if not df_resolvidos.empty:
-        for i, row in df_resolvidos.iterrows():
-            st.markdown(f"""
-            <div class="aviso-box" style="background-color: #f9f9f9; border: 1px dashed #999;">
-                <div class="aviso-header">
-                    <span class="status-resolvido">RESOLVIDO</span> {row['Resolvido_Por']} | SETOR: {row['Setor']}
-                </div>
-                {row['Aviso']}
+    df_r = df_all[df_all["Status"] == "Resolvido"].head(10)
+    for i, row in df_r.iterrows():
+        st.markdown(f"""
+        <div class="aviso-box" style="background-color: #f9f9f9; border: 1px dashed #999;">
+            <div class="aviso-header">
+                <span class="status-resolvido">RESOLVIDO POR:</span> {row['Resolvido_Por']}
             </div>
-            """, unsafe_allow_html=True)
+            <b>AUTOR ORIGINAL:</b> {row['Autor']}<br>
+            <b>DATA POSTAGEM:</b> {row['Data']}<br>
+            <b>SETOR:</b> {row['Setor']}<br>
+            <b>MSG:</b> {row['Aviso']}
+        </div>
+        """, unsafe_allow_html=True)
