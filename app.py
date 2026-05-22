@@ -21,15 +21,14 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- USUÁRIOS ---
-# Novos usuários adicionados com a senha padrão "123456" e permissões totais (Suporte)
+# --- USUÁRIOS (SETORES ATUALIZADOS) ---
 USUARIOS = {
-    "admin": ["notgnihsaw", "Washington Muniz", "Supervisor de Campo"],
+    "admin": ["notgnihsaw", "Washington Muniz", "Operação de campo"],
     "victor melo": ["12345678", "Victor Melo", "Suporte"],
-    "victor": ["123456", "Victor", "Suporte"],
-    "lucas": ["123456", "Lucas", "Suporte"],
-    "levi": ["123456", "Levi", "Suporte"],
-    "alexandro": ["123456", "Alexandro", "Suporte"],
+    "victor": ["123456", "Victor", "Operação de campo"],
+    "lucas": ["123456", "Lucas", "Operação de campo"],
+    "levi": ["123456", "Levi", "Operação de campo"],
+    "alexandro": ["123456", "Alexandro", "Coordenação"],
     "visitante": ["ver123", "Visitante", "Operacional"],
     "visualizar": ["viewst1", "Visualizador Outage", "Visualização"]
 }
@@ -155,7 +154,6 @@ if st.button("SAIR"):
 st.markdown("---")
 st.write("# 📢 OUTAGE ST1")
 
-# Como os novos IDs não estão nesta lista, eles ganham acesso de escrita automaticamente
 somente_leitura = st.session_state["user_id"] in ["visitante", "visualizar"]
 
 col_in, col_out = st.columns([1, 2])
@@ -190,4 +188,3 @@ with col_in:
 
 with col_out:
     renderizar_coluna_logs(somente_leitura)
-    
