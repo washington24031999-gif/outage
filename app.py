@@ -22,7 +22,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- USUÁRIOS ---
-# Adicionado o usuário 'visualizar' à lista de credenciais
 USUARIOS = {
     "admin": ["notgnihsaw", "Washington Muniz", "Supervisor de Campo"],
     "victor melo": ["12345678", "Victor Melo", "Suporte"],
@@ -66,7 +65,84 @@ def load_data():
 def save_data(df):
     df.astype(str).to_csv("avisos.csv", index=False)
 
-# --- INTERFACE ---
+
+# --- FRAGMENTO DE ATUALIZAÇÃO AUTOMÁTICA DA COLUNA DE LOGS ---
+@st.fragment(run_every=3)
+def renderizar_coluna_logs(somente_leitura):
+    """Renderiza e atualiza automaticamente os logs a cada 3 segundos a partir do arquivo CSV"""
+    df_all = load_data()
+    st.write("### LOGS ATIVOS")
+    df_p = df_all[df_all["Status"] == "Pendente"].copy()
+    
+    if not df_p.empty:
+        if not somente_leitura:
+            with st.expander("🛠️ AÇÕES EM MASSA (PENDENTES)"):
+                selecionados_p = []
+                for i, row in df_p.iterrows():
+                    if st.checkbox(f"{row['Data']} - {row['Aviso'][:30]}...", key=f"ch_p_{i}"): 
+                        selecionados_p.append(i)
+                if selecionados_p and st.button(f"RESOLVER {len(selecionados_p)} SELECIONADOS"):
+                    for idx in selecionados_p:
+                        df_all.at[idx, "Status"] = "Resolvido"
+                        df_all.at[idx, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} (Lote)"
+                    save_data(df_all)
+                    st.rerun()
+
+        for i, row in df_p.iterrows():
+            st.markdown(f'<div class="aviso-box"><div class="aviso-header"><span class="status-pendente">PENDENTE</span> {row["Data"]} | AUTOR: {row["Autor"]}</div>{row["Aviso"]}</div>', unsafe_allow_html=True)
+            
+            if not somente_leitura:
+                c_res, c_edit, c_del = st.columns([0.3, 0.3, 0.4])
+                if c_res.button("RESOLVER", key=f"r_{i}"):
+                    df_all.at[i, "Status"] = "Resolvido"
+                    df_all.at[i, "Resolvido_Por"] = st.session_state['nome_colaborador']
+                    save_data(df_all)
+                    st.rerun()
+                if c_edit.button("EDITAR", key=f"e_{i}"):
+                    st.session_state["edit_index"], st.session_state["edit_text"] = i, row["Aviso"]
+                    st.rerun()
+                if c_del.button("EXCLUIR", key=f"d_{i}"):
+                    save_data(df_all.drop(i))
+                    st.rerun()
+    else: 
+        st.write("Nenhuma pendência.")
+
+    st.markdown("---")
+    c_h1, c_h2 = st.columns([0.7, 0.3])
+    c_h1.write("### ARQUIVO HISTORICO")
+    if c_h2.button("OCULTAR / EXIBIR", key="toggle_hist"):
+        st.session_state["mostrar_historico"] = not st.session_state["mostrar_historico"]
+        st.rerun()
+
+    if st.session_state["mostrar_historico"]:
+        df_r = df_all[df_all["Status"] == "Resolvido"].copy()
+        
+        if st.session_state["user_id"] == "admin" and not df_r.empty:
+            with st.expander("🗑️ LIMPEZA DE HISTÓRICO"):
+                st.markdown('<div class="btn-perigo">', unsafe_allow_html=True)
+                if st.button("⚠️ APAGAR TODO O HISTÓRICO"):
+                    save_data(df_all[df_all["Status"] == "Pendente"])
+                    st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+                
+                selecionados_h = []
+                for i, row in df_r.head(100).iterrows():
+                    if st.checkbox(f"Apagar: {row['Data']}", key=f"ch_h_{i}"): 
+                        selecionados_h.append(i)
+                if selecionados_h and st.button(f"APAGAR {len(selecionados_h)} SELECIONADOS"):
+                    save_data(df_all.drop(selecionados_h))
+                    st.rerun()
+
+        for i, row in df_r.head(1000).iterrows():
+            with st.expander(f"OK: {row['Resolvido_Por']} | SETOR: {row['Setor']}"):
+                st.write(row["Aviso"])
+                if not somente_leitura:
+                    if st.button("APAGAR", key=f"del_h_{i}"):
+                        save_data(df_all.drop(i))
+                        st.rerun()
+
+
+# --- INTERFACE PRINCIPAL ---
 st.write(f"**USUARIO:** {st.session_state['nome_colaborador']} | **SETOR:** {st.session_state['setor_colaborador']}")
 if st.button("SAIR"):
     st.session_state.clear()
@@ -75,16 +151,16 @@ if st.button("SAIR"):
 st.markdown("---")
 st.write("# 📢 OUTAGE ST1")
 
-# Trava de permissão para perfis de visualização/leitura
+# Trava de permissão para visualização
 somente_leitura = st.session_state["user_id"] in ["visitante", "visualizar"]
 
 col_in, col_out = st.columns([1, 2])
 
+# Coluna da Esquerda: Entrada/Edição de Dados (Não sofre refresh automático para não apagar o que o admin digita)
 with col_in:
     st.write("### EDITAR ALARME" if st.session_state["edit_index"] is not None else "### ENTRADA DE DADOS")
     st.text_input("SETOR:", value=st.session_state['setor_colaborador'], disabled=True)
     
-    # Campo desabilitado para usuários com perfil de leitura
     msg = st.text_area("MENSAGEM:", value=st.session_state["edit_text"], disabled=somente_leitura)
     
     if not somente_leitura:
@@ -109,40 +185,6 @@ with col_in:
     else:
         st.info("Acesso somente leitura. Você não pode publicar ou editar avisos.")
 
+# Coluna da Direita: Logs Ativos e Histórico (Atualiza dinamicamente via fragmento)
 with col_out:
-    df_all = load_data()
-    st.write("### LOGS ATIVOS")
-    df_p = df_all[df_all["Status"] == "Pendente"].copy()
-    
-    if not df_p.empty:
-        # Ações em massa ocultas para visualização
-        if not somente_leitura:
-            with st.expander("🛠️ AÇÕES EM MASSA (PENDENTES)"):
-                selecionados_p = []
-                for i, row in df_p.iterrows():
-                    if st.checkbox(f"{row['Data']} - {row['Aviso'][:30]}...", key=f"ch_p_{i}"): selecionados_p.append(i)
-                if selecionados_p and st.button(f"RESOLVER {len(selecionados_p)} SELECIONADOS"):
-                    for idx in selecionados_p:
-                        df_all.at[idx, "Status"] = "Resolvido"
-                        df_all.at[idx, "Resolvido_Por"] = f"{st.session_state['nome_colaborador']} (Lote)"
-                    save_data(df_all); st.rerun()
-
-        for i, row in df_p.iterrows():
-            st.markdown(f'<div class="aviso-box"><div class="aviso-header"><span class="status-pendente">PENDENTE</span> {row["Data"]} | AUTOR: {row["Autor"]}</div>{row["Aviso"]}</div>', unsafe_allow_html=True)
-            
-            # Botões de ação ocultos para visualização
-            if not somente_leitura:
-                c_res, c_edit, c_del = st.columns([0.3, 0.3, 0.4])
-                if c_res.button("RESOLVER", key=f"r_{i}"):
-                    df_all.at[i, "Status"] = "Resolvido"; df_all.at[i, "Resolvido_Por"] = st.session_state['nome_colaborador']
-                    save_data(df_all); st.rerun()
-                if c_edit.button("EDITAR", key=f"e_{i}"):
-                    st.session_state["edit_index"], st.session_state["edit_text"] = i, row["Aviso"]; st.rerun()
-                if c_del.button("EXCLUIR", key=f"d_{i}"):
-                    save_data(df_all.drop(i)); st.rerun()
-    else: st.write("Nenhuma pendência.")
-
-    st.markdown("---")
-    c_h1, c_h2 = st.columns([0.7, 0.3])
-    c_h1.write("### ARQUIVO HISTORICO")
-    if c_h2.button("OCULTAR / EXIBIR
+    renderizar_coluna_logs(somente_leitura)
